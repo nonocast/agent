@@ -9,18 +9,18 @@ function App() {
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
   const [useMarkdown, setUseMarkdown] = useState(true);
+
   const textareaRef = useRef(null);
-  const replyRef = useRef(null);
   const socket = useRef(null);
   const fullTextRef = useRef("");
 
+  // 页面加载：恢复上次记录
   useEffect(() => {
     document.title = "agent / nonocast";
     textareaRef.current?.focus();
 
     const savedQuery = localStorage.getItem("lastQuery");
     const savedReply = localStorage.getItem("lastReply");
-
     if (savedQuery) setQuery(savedQuery);
     if (savedReply) {
       setReply(savedReply);
@@ -28,6 +28,17 @@ function App() {
     }
   }, []);
 
+  // 页面滚动到底部（整个页面，而非局部）
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      window.scrollTo({
+        top: document.body.scrollHeight,
+        behavior: "smooth",
+      });
+    });
+  }, [reply]);
+
+  // 连接 socket
   useEffect(() => {
     socket.current = io("http://localhost:7005");
 
@@ -38,13 +49,6 @@ function App() {
     socket.current.on("chunk", (token) => {
       fullTextRef.current += token;
       setReply(fullTextRef.current);
-
-      setTimeout(() => {
-        replyRef.current?.scrollTo({
-          top: replyRef.current.scrollHeight,
-          behavior: "smooth",
-        });
-      }, 0);
     });
 
     socket.current.on("done", () => {
@@ -106,16 +110,16 @@ function App() {
           </button>
         </div>
 
-        <div className="response-box" ref={replyRef}>
+        <div className="response-box">
           {useMarkdown ? (
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {reply}
-            </ReactMarkdown>
+            <div className="markdown">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {reply}
+              </ReactMarkdown>
+            </div>
           ) : (
             <pre
               style={{
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
                 fontFamily: "inherit",
                 lineHeight: "1.5",
                 minHeight: "100px",
