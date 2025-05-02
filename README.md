@@ -1,99 +1,132 @@
-当然可以，下面是为你的 Agent 项目（基于 Node.js + Koa + Socket.IO + React + DeepSeek 接口）量身定制的一个简洁实用的 `README.md` 初版：
+当然 ✅ 以下是完整可用的 `README.md`（基于你当前项目结构与功能），你可以直接复制粘贴使用：
 
 ---
 
-## 📦 agent
+```markdown
+# Agent
 
-基于 DeepSeek 构建的 AI Agent 系统，支持 WebSocket 流式回复、React 前端、Markdown 渲染等功能，适合作为 AI 应用的起步项目或内嵌组件。
-
----
-
-### 🚀 功能特性
-
-* ✅ 使用 [DeepSeek](https://deepseek.com/) 的大模型接口
-* ✅ 后端基于 `Koa + Socket.IO`，支持 token 级别流式响应
-* ✅ 前端使用 `React` + `ReactMarkdown` 实时展示回复
-* ✅ 支持 Markdown 渲染与纯文本切换
-* ✅ 支持快捷键：`Enter` 发送，`Shift+Enter` 换行
-* ✅ 自动滚动到底部，体验类似 ChatGPT
+一个基于 [DeepSeek Chat](https://deepseek.com) 和 MCP 协议的智能数据分析助手，支持通过自然语言提问并自动执行 pandas 代码，对 Excel 表格进行分析。
 
 ---
 
-### 📁 项目结构
+## ✨ 功能特性
 
-```bash
+- 🤖 使用 DeepSeek 生成 pandas 分析代码（自然语言驱动）
+- 📦 MCP Tool（`pandas-exec`）自动执行 Python 代码
+- 🔌 Node.js WebSocket 后端流式连接 DeepSeek 与 MCP
+- 🌐 前端 React 显示 AI 回复与 MCP 执行结果
+- 📊 支持 Excel 表格结构预定义 + 简化 Tool HTTP 协议
+
+---
+
+## 📂 项目结构
+
+```
+
 agent/
-├── backend/         # Node.js + Koa + socket.io 后端
-│   └── index.js
-├── frontend/        # React 前端
-│   ├── src/App.jsx
-│   └── public/
-├── .env             # 存放 DeepSeek API Key
-├── package.json
+├── backend/           # Node.js + Koa + WebSocket 后端
+│   └── mcp-client/    # MCP 客户端 (HTTP 版)
+├── frontend/          # React + socket.io 前端
+├── core/              # prompt & system role 配置
+├── mcp-servers/
+│   └── pandas-exec/   # MCP Tool Server（运行 pandas 分析）
 └── README.md
-```
+
+````
 
 ---
 
-### 🔧 安装 & 启动
+## 🚀 快速开始
 
-#### 1. 设置环境变量
-
-在项目根目录创建 `.env` 文件：
-
-```env
-DEEPSEEK_API_KEY=sk-xxxxxxx   # 替换为你的 DeepSeek API Key
-```
-
-#### 2. 安装依赖
+### 1. 启动 MCP Tool Server
 
 ```bash
-# 后端
-cd backend
-yarn install
+cd mcp-servers/pandas-exec
+uvicorn main:app --host 0.0.0.0 --port 5001
+````
 
-# 前端
-cd ../frontend
-yarn install
-```
-
-#### 3. 启动服务
+### 2. 启动后端服务
 
 ```bash
-# 启动后端服务（监听 7005）
 cd backend
-yarn start
+node index.js
+```
 
-# 启动前端开发服务器（默认 3000）
-cd ../frontend
+### 3. 启动前端开发环境
+
+```bash
+cd frontend
+yarn install
 yarn dev
 ```
 
----
-
-### 🌐 使用说明
-
-打开浏览器访问：
-
-```
-http://localhost:3000
-```
-
-输入问题并按 `Enter`，即可看到 AI 流式回复。
+浏览器访问：[http://localhost:5173](http://localhost:5173)
 
 ---
 
-### 🏷 当前版本
+## 📦 MCP Tool 示例调用
 
-```
-v0.0.2
+你也可以单独通过 curl 调用 pandas-exec：
+
+```bash
+curl -s -X POST http://127.0.0.1:5001/tools/use \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tool": "exec_pandas_code",
+    "args": {
+      "code": "print(df.head())"
+    }
+  }' | jq -r .result
 ```
 
 ---
 
-### 📄 License
+## 🧠 工作流程
 
-MIT License
+```
+用户提问 →
+  DeepSeek 生成 pandas 代码 →
+    WebSocket 后端接收 →
+      MCP Client 执行代码 →
+        pandas-exec MCP Server 执行 →
+          返回结果展示在前端
+```
 
 ---
 
+## 📌 依赖
+
+* Node.js >= 18
+* Python >= 3.10 + uvicorn + pandas + fastapi
+* DeepSeek API Key
+* Excel 文件：Financial Sample.xlsx
+
+---
+
+## 📜 协议说明
+
+MCP 工具使用简化的 HTTP 协议：
+
+```http
+POST /tools/use
+{
+  "tool": "exec_pandas_code",
+  "args": { "code": "..." }
+}
+```
+
+返回：
+
+```json
+{
+  "status": "success",
+  "result": "代码输出内容"
+}
+```
+
+---
+
+## 🏷️ 版本信息
+
+当前版本：`v0.0.4`
+更新内容详见 [CHANGELOG.md](./CHANGELOG.md)

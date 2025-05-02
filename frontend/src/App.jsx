@@ -7,6 +7,7 @@ import "./App.css";
 function App() {
   const [query, setQuery] = useState("");
   const [reply, setReply] = useState("");
+  const [mcpResult, setMcpResult] = useState("");
   const [sending, setSending] = useState(false);
   const [useMarkdown, setUseMarkdown] = useState(true);
 
@@ -14,7 +15,7 @@ function App() {
   const socket = useRef(null);
   const fullTextRef = useRef("");
 
-  // 页面加载：恢复上次记录
+  // 初始化页面：恢复本地记录
   useEffect(() => {
     document.title = "agent / nonocast";
     textareaRef.current?.focus();
@@ -28,17 +29,7 @@ function App() {
     }
   }, []);
 
-  // 页面滚动到底部（整个页面，而非局部）
-  useEffect(() => {
-    requestAnimationFrame(() => {
-      window.scrollTo({
-        top: document.body.scrollHeight,
-        behavior: "smooth",
-      });
-    });
-  }, [reply]);
-
-  // 连接 socket
+  // WebSocket 连接
   useEffect(() => {
     socket.current = io("http://localhost:7005");
 
@@ -46,14 +37,33 @@ function App() {
       console.log("🟢 Connected:", socket.current.id);
     });
 
+    // 接收增量 token
     socket.current.on("chunk", (token) => {
       fullTextRef.current += token;
       setReply(fullTextRef.current);
+
+      requestAnimationFrame(() => {
+        const { scrollY, innerHeight } = window;
+        const scrollBottom = scrollY + innerHeight;
+        const pageBottom = document.body.scrollHeight;
+        const isNearBottom = pageBottom - scrollBottom < 100;
+
+        if (isNearBottom) {
+          window.scrollTo({
+            top: pageBottom,
+            behavior: "smooth",
+          });
+        }
+      });
     });
 
     socket.current.on("done", () => {
       setSending(false);
       localStorage.setItem("lastReply", fullTextRef.current);
+    });
+
+    socket.current.on("mcp_result", (result) => {
+      setMcpResult(result);
     });
 
     socket.current.on("error", (msg) => {
@@ -66,10 +76,12 @@ function App() {
     };
   }, []);
 
+  // 发送用户输入
   const handleSend = useCallback(() => {
     if (!query.trim()) return;
     setSending(true);
     setReply("");
+    setMcpResult("");
     fullTextRef.current = "";
     localStorage.setItem("lastQuery", query);
     socket.current.emit("chat", { message: query });
@@ -128,6 +140,24 @@ function App() {
               {reply}
             </pre>
           )}
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="panel-header">
+          <h2>分析结果（MCP）</h2>
+        </div>
+        <div className="response-box">
+          <pre
+            style={{
+              fontFamily: "inherit",
+              lineHeight: "1.5",
+              minHeight: "100px",
+              whiteSpace: "pre-wrap",
+            }}
+          >
+            {mcpResult}
+          </pre>
         </div>
       </div>
     </div>

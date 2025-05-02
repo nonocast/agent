@@ -6,16 +6,15 @@ const bodyParser = require('koa-bodyparser');
 const cors = require('@koa/cors');
 const Router = require('koa-router');
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
+const { useTool } = require('./mcp-client');
 
-function cleanMarkdown(text) {
-  return text
-    .replace(/^\s*[-•*]\s*$/gm, '')        // 清除空的列表占位项
-    .replace(/\n{3,}/g, '\n\n')             // 连续空行压缩
-    .replace(/^\s+$/gm, '')                 // 清空空白行
-    .replace(/\u2022/g, '-')                // 将•替换为标准列表 -
-    .trim();
-}
+const systemPandasPrompt = fs.readFileSync(
+  path.resolve(__dirname, '../core/prompts/system.pandas.txt'),
+  'utf-8'
+);
 
 const app = new Koa();
 const router = new Router();
@@ -42,22 +41,28 @@ const io = new Server(server, {
 io.on('connection', (socket) => {
   console.log('✅ WebSocket connected:', socket.id);
 
+  let buffer = ''; // 用于流式累计 AI 回复内容
+
   socket.on('chat', async (data) => {
     const message = data.message;
+    buffer = ''; // 每次新对话清空 buffer
 
     try {
       const res = await axios.post(
-        'https://api.deepseek.com/v1/chat/completions',
+        "https://api.deepseek.com/v1/chat/completions",
         {
-          model: 'deepseek-chat',
-          messages: [{ role: 'user', content: message }],
+          model: "deepseek-chat",
+          messages: [
+            { role: "system", content: systemPandasPrompt },
+            { role: "user", content: message },
+          ],
           stream: true,
         },
         {
-          responseType: 'stream',
+          responseType: "stream",
           headers: {
             Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
         }
       );
@@ -75,6 +80,7 @@ io.on('connection', (socket) => {
             const parsed = JSON.parse(json);
             const delta = parsed.choices?.[0]?.delta?.content;
             if (delta) {
+              buffer += delta;
               socket.emit('chunk', delta);
             }
           } catch (err) {
@@ -83,18 +89,28 @@ io.on('connection', (socket) => {
         }
       });
 
-      res.data.on('end', () => {
+      res.data.on('end', async () => {
         socket.emit('done');
+
+        // 判断 buffer 是否为可执行 pandas 代码
+        if (buffer.includes('df')) {
+          const result = await useTool('exec_pandas_code', { code: buffer });
+          socket.emit('mcp_result', result);
+        }
+
+        buffer = ''; // 清空缓存，准备下一次对话
       });
 
     } catch (err) {
       console.error('❌ DeepSeek Error:', err.message);
       socket.emit('error', 'Stream failed');
+      buffer = ''; // 出错时也清空
     }
   });
 
   socket.on('disconnect', () => {
     console.log('❎ Disconnected:', socket.id);
+    buffer = ''; // 清空当前 socket 的缓存
   });
 });
 
